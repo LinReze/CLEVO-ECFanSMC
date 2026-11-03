@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BaseClassName</key>
+	<string>ITEDevice</string>
+	<key>CompatibleDevices</key>
+	<array>
+		<dict>
+			<key>DisplayName</key>
+			<string>ITE IT8716F</string>
+			<key>DeviceID</key>
+			<integer>0x8716</integer>
+		</dict>
+		<dict>
+			<key>DisplayName</key>
+			<string>ITE IT8718F</string>
+			<key>DeviceID</key>
+			<integer>0x8718</integer>
+		</dict>
+		<dict>
+			<key>DisplayName</key>
+			<string>ITE IT8720F</string>
+			<key>DeviceID</key>
+			<integer>0x8720</integer>
+		</dict>
+	</array>
+	<key>Sensors</key>
+	<dict>
+		<key>Tachometer</key>
+		<array>
+			<dict>
+				<key>Name</key>
+				<string>FAN1</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>FAN2</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>FAN3</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>FAN4</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>FAN5</string>
+			</dict>
+		</array>
+		<key>VoltageReading</key>
+		<string>voltageReadOld</string>
+		<key>Voltage</key>
+		<array>
+			<dict>
+				<key>Name</key>
+				<string>VIN0</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN1</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN2</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN3</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN4</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN5</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN6</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VIN7</string>
+			</dict>
+			<dict>
+				<key>Name</key>
+				<string>VBAT</string>
+			</dict>
+		</array>
+	</dict>
+</dict>
+</plist>
