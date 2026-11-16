@@ -1,0 +1,15 @@
+# macOS Finder 垃圾文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# 编译中间产物（最终 kext 保留在 ECFanSMC/build/ 里并入库，方便直接下载）
+*.o
+*.d
+*.dSYM/
+
+# Xcode / 编辑器
+xcuserdata/
+*.xcuserstate

@@ -8,6 +8,132 @@
 
 ECFanSMC *ecfanGetInstance();
 
+// ---- EC RAM 任意字节读写（ECWA 地址 / ECWD 数据）----
+// 两个 key 是不同实例，共享这把「当前偏移」，所以放文件作用域静态变量。
+static uint8_t gEcCursor = 0x10;   // 默认指向 0x10（设备状态字节：适配器/电池在位）
+
+SMC_RESULT EcAddrKey::readAccess() {
+	data[0] = gEcCursor;
+	return SmcSuccess;
+}
+
+SMC_RESULT EcAddrKey::update(const SMC_DATA *src) {
+	gEcCursor = src[0];
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+SMC_RESULT EcDataKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	data[0] = inst ? inst->readEcByte(gEcCursor) : 0;
+	return SmcSuccess;
+}
+
+SMC_RESULT EcDataKey::update(const SMC_DATA *src) {
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	if (!inst->writeEcByte(gEcCursor, src[0]))
+		return SmcBadParameter;
+
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+// ---- EC 端口协议（0x62/0x66）：ECPA 地址 / ECPD 数据 ----
+// EC 只监视端口上的 FCMD 写入来执行命令；ECMD 命令通道走这里。
+static uint8_t gEcPortCursor = 0xF8;   // 默认指向 FCMD
+
+SMC_RESULT EcPortAddrKey::readAccess() {
+	data[0] = gEcPortCursor;
+	return SmcSuccess;
+}
+
+SMC_RESULT EcPortAddrKey::update(const SMC_DATA *src) {
+	gEcPortCursor = src[0];
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+SMC_RESULT EcPortDataKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	data[0] = inst ? inst->readEcPortByte(gEcPortCursor) : 0;
+	return SmcSuccess;
+}
+
+SMC_RESULT EcPortDataKey::update(const SMC_DATA *src) {
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	if (!inst->writeEcPortByte(gEcPortCursor, src[0]))
+		return SmcBadParameter;
+
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+// ---- 第二块 EC RAM（0xFE0B0300）：键盘背光 / RGB / 风扇曲线 ----
+static uint8_t gEc2Cursor = 0x89;   // 默认指向 KBBH（背光亮度）
+
+SMC_RESULT Ec2AddrKey::readAccess() {
+	data[0] = gEc2Cursor;
+	return SmcSuccess;
+}
+
+SMC_RESULT Ec2AddrKey::update(const SMC_DATA *src) {
+	gEc2Cursor = src[0];
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+SMC_RESULT Ec2DataKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	data[0] = inst ? inst->readEc2Byte(gEc2Cursor) : 0;
+	return SmcSuccess;
+}
+
+SMC_RESULT Ec2DataKey::update(const SMC_DATA *src) {
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	if (!inst->writeEc2Byte(gEc2Cursor, src[0]))
+		return SmcBadParameter;
+
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+SMC_RESULT KeyboardBacklightKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	data[0] = inst ? inst->readKeyboardBacklight() : 0;
+	return SmcSuccess;
+}
+
+SMC_RESULT KeyboardBacklightKey::update(const SMC_DATA *src) {
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	if (!inst->writeKeyboardBacklight(src[0]))
+		return SmcBadParameter;
+
+	VirtualSMCValue::update(src);
+	return SmcSuccess;
+}
+
+SMC_RESULT ECDump2Key::readAccess() {
+	auto inst = ecfanGetInstance();
+	if (!inst) {
+		memset(data, 0, 32);
+		return SmcSuccess;
+	}
+	inst->readEc2Block(index * 32, data, 32);
+	return SmcSuccess;
+}
+
 // 风扇转速（只读）—— encodeIntFp：fpe2 定点，RPM 直接填
 SMC_RESULT F0Ac::readAccess() {
 	auto inst = ecfanGetInstance();
@@ -67,7 +193,7 @@ SMC_RESULT MinKey::update(const SMC_DATA *src) {
 }
 
 SMC_RESULT MaxKey::readAccess() {
-	// 蓝天模具风扇常见最大转速约 6000~6800，默认取 6500 留余量；可由 F0Mx 写入覆盖
+	// 蓝天模具风扇最大转速，GPU 风扇（压 4060）可能更高，默认取 6500 留余量
 	auto inst = ecfanGetInstance();
 	uint16_t rpm = inst ? inst->readMaxRpm(index) : 6500;
 	*reinterpret_cast<uint16_t *>(data) = VirtualSMCAPI::encodeIntFp(SmcKeyTypeFpe2, rpm);
@@ -153,5 +279,72 @@ SMC_RESULT ECDumpKey::readAccess() {
 		return SmcSuccess;
 	}
 	inst->readEcBlock(index * 32, data, 32);
+	return SmcSuccess;
+}
+
+// ---- RAPL 功耗墙 ----
+// ui16 大端：Apple SMC 的多字节整数统一大端存放，和 "FS! " 的写法保持一致。
+static inline void storeU16BE(uint8_t *dst, uint16_t v) {
+	dst[0] = static_cast<uint8_t>(v >> 8);
+	dst[1] = static_cast<uint8_t>(v & 0xFF);
+}
+
+SMC_RESULT Pl1Key::readAccess() {
+	auto inst = ecfanGetInstance();
+	storeU16BE(data, inst ? inst->readPl1Watts() : 0);
+	return SmcSuccess;
+}
+
+SMC_RESULT Pl2Key::readAccess() {
+	auto inst = ecfanGetInstance();
+	storeU16BE(data, inst ? inst->readPl2Watts() : 0);
+	return SmcSuccess;
+}
+
+SMC_RESULT RaplUnitKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	storeU16BE(data, inst ? static_cast<uint16_t>(inst->readRaplUnit()) : 0);
+	return SmcSuccess;
+}
+
+SMC_RESULT Pl1WriteKey::readAccess() {
+	// 回读走真实寄存器：功耗墙是硬件状态，不需要像 F0Tg 那样缓存目标值
+	auto inst = ecfanGetInstance();
+	storeU16BE(data, inst ? inst->readPl1Watts() : 0);
+	return SmcSuccess;
+}
+
+SMC_RESULT Pl1WriteKey::update(const SMC_DATA *src) {
+	VirtualSMCValue::update(src);
+
+	uint16_t watts = static_cast<uint16_t>((src[0] << 8) | src[1]);
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	// 越界直接拒绝，不做静默钳制 —— 让调用方明确知道写失败了
+	if (!inst->writePl1Watts(watts))
+		return SmcBadParameter;
+
+	return SmcSuccess;
+}
+
+SMC_RESULT Pl2WriteKey::readAccess() {
+	auto inst = ecfanGetInstance();
+	storeU16BE(data, inst ? inst->readPl2Watts() : 0);
+	return SmcSuccess;
+}
+
+SMC_RESULT Pl2WriteKey::update(const SMC_DATA *src) {
+	VirtualSMCValue::update(src);
+
+	uint16_t watts = static_cast<uint16_t>((src[0] << 8) | src[1]);
+	auto inst = ecfanGetInstance();
+	if (!inst)
+		return SmcNotWritable;
+
+	if (!inst->writePl2Watts(watts))
+		return SmcBadParameter;
+
 	return SmcSuccess;
 }

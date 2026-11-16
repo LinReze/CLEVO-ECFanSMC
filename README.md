@@ -20,6 +20,9 @@
 - **读**：CPU 温度（`TC0D`/`TC0P`，sp78）、双风扇实时转速（`F0Ac/F1Ac`，fpe2，大端 + `2156220/raw` 换算）、占空比回读、EC RAM 全表诊断键（`EC00`~`EC07`）
 - **写**：目标转速（`F0Tg`）、最小/最大区间（`F0Mn`/`F0Mx`）、手动/自动模式（`F0Md`）、强制位掩码（`FS! `）——写路径走 EC 命令 `0x99`
 - **兼容性**：完整实现 Apple SMC 风扇键语义（含 `F0Tg` 回读缓存），通过 Macs Fan Control / TG Pro / Stats / smcFanControl 等主流工具的写后校验
+- **功耗**：通过 RAPL MSR（`0x606` / `0x610`）读取封装功耗墙 PL1 / PL2，暴露成 SMC 键
+- **键盘背光**：映射第二块 EC RAM（`0xFE0B0300`），把背光亮度（`KBBH`）桥接成 SMC 键，可读可写
+- **电池在位**：启动时校正 EC 电池在位位（`EC[0x10]` bit2），避免 macOS 菜单栏电池图标消失
 - **安全**：等待握手带超时（EC 无响应不会挂死内核）；风扇 index 1-based；支持 `release` 命令一键交还 EC 固件自动控制
 
 ## 兼容范围
@@ -27,7 +30,7 @@
 | 项       | 说明                                                                                                                      |
 | ------- | ----------------------------------------------------------------------------------------------------------------------- |
 | 模具      | 蓝天/同方（Clevo/Tongfang）体系公模——EC 为 ITE IT55xx 系、数据区内存映射 `0xFE0B0100` 一带的机型。已实测：七彩虹隐星 P15 23（EVOL P15 23）、神舟 TX8（n960kp）同协议 |
-| macOS   | 10.15+（x86_64），实测 15.x                                                                                                  |
+| macOS   | 10.15+（x86_64），实测 15.x / 26.x                                                                                             |
 | 引导      | OpenCore（需 Lilu + VirtualSMC）                                                                                           |
 | CPU/GPU | 无关（kext 只访问 EC，不感知处理器型号；同模具不同配置直接通用）                                                                                    |
 
@@ -36,13 +39,13 @@
 
 ## 快速开始
 
-**不想编译？直接用成品**：[`dist/ECFanSMC-0.2.1.zip`](dist/ECFanSMC-0.2.1.zip)  
+**不想编译？直接用成品**：[`dist/ECFanSMC-0.3.2.zip`](dist/ECFanSMC-0.3.2.zip)  
 （或 `dist/ECFanSMC.kext` 目录），解开后跳到第 2 步。  
-二进制与源码同一版本（0.2.1，x86_64）：
+二进制与源码同一版本（0.3.2，x86_64）：
 
 ```
-ECFanSMC（二进制）  sha256 92300d7dd42ab92c99dea73b0f9457783f87cc1fa477b96baed177e1163f3fa1
-ECFanSMC-0.2.1.zip  sha256 a63677a2aa357492...
+ECFanSMC（二进制）  sha256 3a81256d38f40a1daf941df9982885ceb1e5121a4d330c29063646fb57fb2301
+ECFanSMC-0.3.2.zip  sha256 7020a3d9e8fd8ae2bd8e8e3f99ac9e913fef92a42aa8b84d1ed76b11b7551bb1
 ```
 
 1. 编译（macOS + Xcode CLT，首次自动拉取依赖到 `./deps/`）：
@@ -59,8 +62,8 @@ ECFanSMC-0.2.1.zip  sha256 a63677a2aa357492...
 
 ```
 dist/              预编译成品（不想编译直接用）
-  ECFanSMC.kext    可直接部署的 kext（x86_64，0.2.1）
-  ECFanSMC-0.2.1.zip
+  ECFanSMC.kext    可直接部署的 kext（x86_64，0.3.2）
+  ECFanSMC-0.3.2.zip
 ECFanSMC/          kext 源码（build.sh 一键编译，check-symbols.sh 符号审计）
 tools/             用户态工具
   smc_probe.c      枚举 AppleSMC 全部键（判断系统里有没有风扇键、验证注册结果）
@@ -101,7 +104,8 @@ docs/              使用手册（按顺序读即可上手，见下）
   `release`（交还自动）或断电重启，EC 固件会恢复自带的温控曲线。
 - **不要同时运行两个风扇控制程序**（如 Macs Fan Control 与本插件配套工具），  
   它们会互相覆写目标转速。
-- 本项目与 EC 固件交互仅限风扇/温度寄存器与 0x99 命令，未触碰键盘/电池等其他 EC 功能。
+- 本项目与 EC 固件的写交互仅限风扇/温度寄存器与 0x99 命令；键盘背光只读写背光亮度寄存器，
+  另有一处电池在位位的开机校正，不涉及键盘/电池的其他功能寄存器。
 
 ## 致谢
 

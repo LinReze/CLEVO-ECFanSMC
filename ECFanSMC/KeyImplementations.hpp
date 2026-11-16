@@ -42,4 +42,76 @@ protected:
 class TC0D : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; };
 class TC0P : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; };
 
+// ---- RAPL 功耗墙 ----
+// RP01/RP02：只读，当前 PL1/PL2 功耗墙（ui16，整数瓦）
+class Pl1Key : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; };
+class Pl2Key : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; };
+
+// RW01/RW02：可写，把 PL1/PL2 设成指定瓦数（内部钳制 5..150W，且保留 enable/时间窗位）
+class Pl1WriteKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+class Pl2WriteKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+
+// ECPA / ECPD：EC 端口协议（0x62/0x66）任意字节读写。
+// 与 ECWA/ECWD（内存窗口）的区别：端口写 FCMD 会真正触发 EC 命令执行。
+class EcPortAddrKey : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; SMC_RESULT update(const SMC_DATA *src) override; };
+class EcPortDataKey : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; SMC_RESULT update(const SMC_DATA *src) override; };
+
+// RPUN：RAPL power unit（诊断用，验证换算是否正确）
+class RaplUnitKey : public ECFanKey { using ECFanKey::ECFanKey; protected: SMC_RESULT readAccess() override; };
+
+// ---- EC RAM 任意字节读写 ----
+// ECWA：当前选中的 EC 偏移；ECWD：该偏移上的字节。两者都可读写。
+// 偏移存在文件作用域静态变量里，让两个 key 共享同一个「指针」。
+class EcAddrKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+class EcDataKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+
+// ---- 第二块 EC RAM（0xFE0B0300，键盘背光/灯效）----
+class Ec2AddrKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+class Ec2DataKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+
+// 键盘背光亮度（KBBH @ RAM3 0x89）
+class KeyboardBacklightKey : public ECFanKey {
+	using ECFanKey::ECFanKey;
+protected:
+	SMC_RESULT readAccess() override;
+	SMC_RESULT update(const SMC_DATA *src) override;
+};
+
+// RAM3 全表镜像（EC10..EC17）
+class ECDump2Key : public FanIndexKey {
+	using FanIndexKey::FanIndexKey;
+protected:
+	SMC_RESULT readAccess() override;
+};
+
 #endif /* KeyImplementations_hpp */

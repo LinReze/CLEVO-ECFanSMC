@@ -82,7 +82,7 @@ ln -s "$LILU/Headers" Headers
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 INCLUDES="-I. -I$LILU -I$MKSDK/Headers -I$SDK/System/Library/Frameworks/Kernel.framework/Headers"
 
-DEFS="-DMODULE_VERSION=0.2.1 -DPRODUCT_NAME=ECFanSMC -DLILU_CUSTOM_IOKIT_INIT=1 -DDEBUG=1"
+DEFS="-DMODULE_VERSION=0.3.2 -DPRODUCT_NAME=ECFanSMC -DLILU_CUSTOM_IOKIT_INIT=1 -DDEBUG=1"
 
 CFLAGS="-target x86_64-apple-macos10.8 \
         -mkernel -mcmodel=kernel \
